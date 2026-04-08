@@ -24,3 +24,5 @@ Doublemount uses two nfs servers and two separate mounts to simulate remote even
 --servePath-2  is the path in the virtual file system to serve
 --mount-path-2 is the path on the local system to mount the second folder to
 
+### Known Issues
+- Doesn't propagate mutation events to root folder

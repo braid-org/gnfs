@@ -62,7 +62,6 @@ type UnifiedFileSystemNode = FileNode | SymlinkNode | DirectoryNode;
  * const state = createMemoryBackedState({
  *   type: 'index',
  *   meta: {
- *     type: 'index',
  *     ctime: now,
  *     mtime: now,
  *     atime: now,
@@ -72,7 +71,6 @@ type UnifiedFileSystemNode = FileNode | SymlinkNode | DirectoryNode;
  *     'documents': {
  *       type: 'index',
  *       meta: {
- *         type: 'index',
  *         ctime: now,
  *         mtime: now,
  *         atime: now,
@@ -82,7 +80,6 @@ type UnifiedFileSystemNode = FileNode | SymlinkNode | DirectoryNode;
  *         'notes.txt': {
  *           type: 'file',
  *           meta: {
- *             type: 'file',
  *             ctime: now,
  *             mtime: now,
  *             atime: now,
@@ -396,14 +393,12 @@ export const createMemoryBackedState = (
       }
 
       // Navigate to the path
-      const segments = path.replace(/^\//, '').split('/');
-
       let current: UnifiedFileSystemNode | null = state;
 
-      for (const segment of segments) {
-        if (segment === '') {
+      // Descend down each segment of the path to reach the object to get
+      for (const segment of path.replace(/^\//, '').split('/')) {
+        if (segment === '')
           continue;
-        }
 
         if (current === null || current.type !== 'index') {
           // Trying to navigate into a file or through null
@@ -416,11 +411,20 @@ export const createMemoryBackedState = (
           break;
         }
 
+        // Update current
         current = current.entries[segment];
       }
 
+      // Now we found the target!
+      var target = current
+
+      // Now check the type of the object we're getting.
+      // We send updates to different things in different ways.
       if (options.type === 'body') {
-        if (current === null) {
+        // Client is asking for a body.
+
+        // Make sure it exists, first.
+        if (target === null) {
           // Resource doesn't exist
           connectedReceivers[peerId].send({
             update: {
@@ -429,9 +433,12 @@ export const createMemoryBackedState = (
               headers: { type: 'body' },
             },
           });
-        } else if (current.type === 'file' || current.type === 'symlink') {
+        }
+
+        // In the normal case, we can send it!
+        else if (target.type === 'file' || target.type === 'symlink') {
           // It's a file or symlink
-          const fileNode = current;
+          const fileNode = target;
           connectedReceivers[peerId].send({
             update: {
               path,
@@ -439,8 +446,10 @@ export const createMemoryBackedState = (
               headers: { type: 'body' },
             },
           });
-        } else {
-          // It's a directory, can't provide body
+        }
+
+        // Else it's a directory -- they don't have a body
+        else {
           connectedReceivers[peerId].send({
             update: {
               path,
@@ -449,28 +458,24 @@ export const createMemoryBackedState = (
             },
           });
         }
-      } else if (options.type === 'header') {
-        const meta = getMeta(path);
-        if (meta) {
-          connectedReceivers[peerId].send({
-            update: {
-              path,
-              body: meta,
-              headers: { type: 'header' },
-            },
-          });
-        } else {
-          connectedReceivers[peerId].send({
-            update: {
-              path,
-              body: null,
-              headers: { type: 'header' },
-            },
-          });
-        }
-      } else if (options.type === 'index') {
-        if (current === null) {
-          // Resource doesn't exist
+      }
+
+      // We send headers in a funny way
+      else if (options.type === 'header') {
+        connectedReceivers[peerId].send({
+          update: {
+            path,
+            body: getMeta(path) || null,
+            headers: { type: 'header' },
+          },
+        });
+      }
+
+      // Client asked for index!  Let's send that.
+      else if (options.type === 'index') {
+
+        // Check that index exists
+        if (target === null) {
           connectedReceivers[peerId].send({
             update: {
               path,
@@ -478,8 +483,10 @@ export const createMemoryBackedState = (
               headers: { type: 'index' },
             },
           });
-        } else if (current.type !== 'index') {
-          // It's a file or symlink, can't provide index
+        }
+
+        // Check it's not a file or symlink
+        else if (target.type !== 'index') {
           connectedReceivers[peerId].send({
             update: {
               path,
@@ -487,12 +494,13 @@ export const createMemoryBackedState = (
               headers: { type: 'index' },
             },
           });
-        } else {
-          // It's a directory, build index
+        }
+
+        // Otherwise it's a directory.  Yay!  Send the index!
+        else {
           const index: IndexBody = [];
-          for (const [key] of Object.entries(current.entries)) {
+          for (const [key] of Object.entries(target.entries))
             index.push({ link: `${key}` });
-          }
           connectedReceivers[peerId].send({
             update: {
               path,
@@ -503,7 +511,9 @@ export const createMemoryBackedState = (
         }
       }
 
+      // Is client asking to subscribe?
       if (subscribe) {
+        // Then remember the subscription!
         subscriptions[peerId] ||= {};
         subscriptions[peerId][path] ||= {};
         const subOptions = getSubscriptionOptionKey(options);
@@ -639,9 +649,8 @@ export const createMemoryBackedState = (
 
           // It's a directory, build index
           const index: IndexBody = [];
-          for (const [key] of Object.entries(parentFolder.entries)) {
+          for (const [key] of Object.entries(parentFolder.entries))
             index.push({ link: `${key}` });
-          }
 
           // also propagate change for the parent
           const parentPath =
