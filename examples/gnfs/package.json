@@ -1,0 +1,51 @@
+{
+  "name": "gnfs",
+  "version": "0.0.9",
+  "description": "CLI tool to serve any filesystem via NFS on macOS",
+  "type": "module",
+  "main": "dist/start-server.js",
+  "bin": {
+    "gnfs": "dist/start-server.js"
+  },
+  "files": [
+    "dist",
+    "readme.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "dev": "tsx bin/start-server.ts",
+    "dev2": "tsx --inspect bin/start-doublemount-server.ts",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "nfs",
+    "cli",
+    "mount",
+    "filesystem",
+    "virtual-fs",
+    "macos"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "nfs-serve": "workspace:*",
+    "commander": "^12.1.0",
+    "fsevents": "^2.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.0",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
